@@ -1,0 +1,469 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<meta name="theme-color" content="#2563eb">
+<title>Ипотечный калькулятор</title>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+<style>
+  :root{
+    --primary:#2563eb; --primary-dark:#1d4ed8; --bg:#f5f7fb; --card:#ffffff;
+    --text:#1f2937; --muted:#6b7280; --border:#e5e7eb; --green:#16a34a; --red:#dc2626;
+  }
+  *{box-sizing:border-box;}
+  body{margin:0; font-family:'Segoe UI',Roboto,Arial,sans-serif; background:var(--bg); color:var(--text);}
+  header{background:linear-gradient(135deg,var(--primary),#1e3a8a); color:#fff; padding:28px 20px; text-align:center;}
+  header h1{margin:0 0 6px 0; font-size:26px;}
+  header p{margin:0; opacity:.9; font-size:14px;}
+  .container{
+    max-width:1200px; margin:0 auto; padding:24px 16px 60px;
+    display:grid; grid-template-columns:380px minmax(0,1fr); gap:24px;
+  }
+  .container > *{min-width:0;}
+  @media (max-width:900px){ .container{grid-template-columns:minmax(0,1fr);} }
+  .card{
+    background:var(--card); border-radius:14px; padding:22px; box-shadow:0 2px 10px rgba(0,0,0,.05);
+    border:1px solid var(--border); margin-bottom:20px;
+  }
+  .card h2{margin-top:0; font-size:17px; color:var(--primary-dark); border-bottom:2px solid var(--border); padding-bottom:10px;}
+  label{display:block; font-size:13px; color:var(--muted); margin:14px 0 6px;}
+  input[type=number], select{
+    width:100%; padding:10px 12px; border:1px solid var(--border); border-radius:8px; font-size:15px;
+    background:#fafbfc;
+  }
+  input[type=range]{width:100%; accent-color:var(--primary);}
+  .hint{font-size:12px; color:var(--muted); margin-top:4px;}
+  .row-between{display:flex; justify-content:space-between; align-items:center;}
+  .badge{
+    display:inline-block; background:#eef2ff; color:var(--primary-dark); padding:3px 10px; border-radius:20px;
+    font-size:12px; font-weight:600;
+  }
+  .result-grid{display:grid; grid-template-columns:1fr 1fr; gap:14px;}
+  .result-item{background:#f8fafc; border-radius:10px; padding:14px; border:1px solid var(--border);}
+  .result-item .label{font-size:12px; color:var(--muted); margin-bottom:4px;}
+  .result-item .value{font-size:19px; font-weight:700; color:var(--text);}
+  .result-item.highlight{background:linear-gradient(135deg,#eef2ff,#e0e7ff); border-color:#c7d2fe;}
+  .result-item.highlight .value{color:var(--primary-dark);}
+  table{width:100%; border-collapse:collapse; font-size:13px;}
+  th,td{padding:8px 10px; text-align:right; border-bottom:1px solid var(--border); white-space:nowrap;}
+  th{background:#f1f5f9; color:var(--muted); font-weight:600; position:sticky; top:0;}
+  td:first-child, th:first-child{text-align:center;}
+  .table-wrap{max-height:420px; overflow:auto; border:1px solid var(--border); border-radius:10px; -webkit-overflow-scrolling:touch;}
+  .pill-warning{
+    background:#fef3c7; border:1px solid #fde68a; color:#92400e; padding:10px 12px; border-radius:8px;
+    font-size:13px; margin-top:10px; display:none;
+  }
+  .pill-warning.show{display:block;}
+  canvas{max-height:280px;}
+  .chart-box{margin-bottom:24px;}
+  .footer-note{text-align:center; color:var(--muted); font-size:12px; margin-top:20px;}
+  .btn-secondary{
+    background:#fff; color:var(--primary); border:1px solid var(--primary); padding:8px 14px; border-radius:8px;
+    cursor:pointer; font-size:13px; font-weight:600;
+  }
+  .btn-secondary:hover{background:#eef2ff;}
+  .btn-primary{
+    width:100%; margin-top:20px; padding:14px 20px; border:none; border-radius:10px;
+    background:linear-gradient(135deg,var(--primary),var(--primary-dark)); color:#fff;
+    font-size:16px; font-weight:700; cursor:pointer; box-shadow:0 4px 12px rgba(37,99,235,.3);
+    transition:.15s;
+  }
+  .btn-primary:hover{ filter:brightness(1.08); transform:translateY(-1px); }
+  .btn-primary:active{ transform:translateY(0); }
+
+  /* ===== Мобильная адаптация ===== */
+  html{-webkit-text-size-adjust:100%;}
+  canvas{display:block; width:100% !important;}
+
+  /* Увеличенная зона захвата ползунка ставки */
+  input[type=range]{
+    -webkit-appearance:none; appearance:none;
+    height:32px; margin:0; background:transparent; cursor:pointer;
+  }
+  input[type=range]::-webkit-slider-runnable-track{
+    height:8px; border-radius:999px; background:#dbe4f3;
+  }
+  input[type=range]::-webkit-slider-thumb{
+    -webkit-appearance:none; appearance:none;
+    width:26px; height:26px; margin-top:-9px; border-radius:50%;
+    background:#fff; border:3px solid var(--primary);
+    box-shadow:0 2px 6px rgba(37,99,235,.35);
+  }
+  input[type=range]::-moz-range-track{height:8px; border-radius:999px; background:#dbe4f3;}
+  input[type=range]::-moz-range-thumb{
+    width:22px; height:22px; border-radius:50%; background:#fff;
+    border:3px solid var(--primary); box-shadow:0 2px 6px rgba(37,99,235,.35);
+  }
+  input[type=range]:focus{outline:none;}
+
+  @media (max-width:900px){
+    .container{padding:16px 14px 48px; gap:16px;}
+    .card{padding:18px;}
+    .result-grid{gap:10px;}
+    canvas{max-height:240px;}
+  }
+
+  @media (max-width:560px){
+    header{padding:20px 16px 18px;}
+    header h1{font-size:21px;}
+    header p{font-size:12.5px;}
+
+    .container{padding:12px 10px 40px; gap:14px;}
+    .card{padding:16px; border-radius:12px; margin-bottom:14px;}
+    .card h2{font-size:15.5px; padding-bottom:8px;}
+
+    /* Поля не менее 48px и 16px шрифт, чтобы iOS не зумил страницу */
+    input[type=number], select{
+      font-size:16px; padding:12px 12px; min-height:48px; border-radius:10px;
+    }
+    label{font-size:12.5px; margin:14px 0 5px;}
+
+    .btn-primary{min-height:52px; font-size:16px; padding:15px 18px; margin-top:16px;}
+    .btn-secondary{min-height:42px; padding:10px 14px; font-size:13px;}
+
+    /* Результаты в одну колонку */
+    .result-grid{grid-template-columns:minmax(0,1fr); gap:9px;}
+    .result-item{padding:12px 14px;}
+    .result-item .value{font-size:18px;}
+    .result-item .label{font-size:11.5px;}
+
+    /* Таблица: скролл внутри карточки, компактные ячейки */
+    .table-wrap{max-height:60vh; border-radius:10px;}
+    th,td{padding:9px 8px; font-size:12px;}
+    th{font-size:11px;}
+
+    canvas{max-height:210px;}
+    .footer-note{font-size:11px; padding:0 12px;}
+  }
+
+  @media (max-width:380px){
+    .result-item .value{font-size:16.5px;}
+    header h1{font-size:19px;}
+    .card{padding:14px;}
+  }
+
+  /* На сенсорных экранах убираем залипание hover-эффектов */
+  @media (hover:none){
+    .btn-primary:hover{filter:none; transform:none;}
+    .btn-secondary:hover{background:#fff;}
+  }
+</style>
+</head>
+<body>
+<header>
+  <h1>🏠 Ипотечный калькулятор</h1>
+  <p>Расчёт аннуитетных и дифференцированных платежей по ипотечному кредиту</p>
+</header>
+
+<div class="container">
+
+  <div>
+    <div class="card">
+      <h2>Входные условия</h2>
+
+      <label>Стоимость объекта, ₽</label>
+      <input type="number" id="price" value="9000000" step="100000" min="100000" inputmode="numeric">
+
+      <label class="row-between">
+        <span>Первоначальный взнос, ₽ <span class="hint" style="display:inline">(мин. 20,1%)</span></span>
+      </label>
+      <input type="number" id="downpayment" value="1809000" step="10000" min="0" inputmode="numeric">
+      <div class="pill-warning" id="warnDown">Взнос ниже минимального — будет применён минимум 20,1%</div>
+
+      <label>Годовая ставка, % <span class="badge" id="rateBadge">18.2%</span></label>
+      <input type="range" id="rate" min="1" max="35" step="0.1" value="18.2">
+
+      <label>Срок кредита, лет</label>
+      <input type="number" id="years" value="10" min="1" max="30" step="1" inputmode="numeric">
+
+      <label>Нормативная площадь жилья, м²</label>
+      <select id="area">
+        <option value="33">33 м² (1 человек)</option>
+        <option value="42">42 м² (2 человека)</option>
+        <option value="60" selected>60 м² (стандарт)</option>
+        <option value="90">90 м² (многодетные)</option>
+      </select>
+
+      <label>Регион работы</label>
+      <select id="region"></select>
+      <div class="hint">Стоимость 1 м² подставляется автоматически для расчёта предельной базы по субсидии</div>
+      <div class="hint" id="regionInfo" style="margin-top:8px; padding:8px 10px; background:#eef2ff; border-radius:8px; color:#1e3a8a;"></div>
+
+      <label>Тип платежа</label>
+      <select id="paymentType">
+        <option value="annuity">Аннуитетный (равными платежами)</option>
+        <option value="differentiated">Дифференцированный (убывающий)</option>
+      </select>
+
+      <button id="calcBtn" class="btn-primary">🧮 Рассчитать</button>
+    </div>
+  </div>
+
+  <div>
+    <div class="card">
+      <h2>Результаты расчёта</h2>
+      <div class="result-grid">
+        <div class="result-item highlight">
+          <div class="label">Сумма кредита</div>
+          <div class="value" id="rLoanSum">—</div>
+        </div>
+        <div class="result-item highlight">
+          <div class="label">Ежемесячный платёж</div>
+          <div class="value" id="rMonthly">—</div>
+        </div>
+        <div class="result-item">
+          <div class="label">Первоначальный взнос (факт.)</div>
+          <div class="value" id="rDownFact">—</div>
+        </div>
+        <div class="result-item">
+          <div class="label">Месячная ставка</div>
+          <div class="value" id="rMonthlyRate">—</div>
+        </div>
+        <div class="result-item">
+          <div class="label">Переплата по процентам</div>
+          <div class="value" id="rOverpay">—</div>
+        </div>
+        <div class="result-item">
+          <div class="label">Итого выплат за весь срок</div>
+          <div class="value" id="rTotal">—</div>
+        </div>
+        <div class="result-item">
+          <div class="label">Предельная нормат. стоимость жилья</div>
+          <div class="value" id="rNormCost">—</div>
+        </div>
+        <div class="result-item">
+          <div class="label">Компенсация % по субсидии</div>
+          <div class="value" id="rSubsidyTotal">—</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="card chart-box">
+      <h2>Структура платежей</h2>
+      <canvas id="pieChart"></canvas>
+    </div>
+
+    <div class="card chart-box">
+      <h2>График: остаток долга и платежи по месяцам</h2>
+      <canvas id="lineChart"></canvas>
+    </div>
+
+    <div class="card">
+      <div class="row-between" style="margin-bottom:10px; gap:10px; flex-wrap:wrap;">
+        <h2 style="margin:0; border:none; padding:0;">Таблица платежей (график погашения)</h2>
+        <button class="btn-secondary" id="exportCsv">⬇ Экспорт в CSV</button>
+      </div>
+      <div class="table-wrap">
+        <table id="scheduleTable">
+          <thead>
+            <tr>
+              <th>№</th><th>Остаток на начало</th><th>Проценты</th><th>Основной долг</th>
+              <th>Платёж</th><th>Остаток на конец</th>
+              <th>Лимит по %</th><th>Компенсация работодателя</th><th>Доплата из своих средств</th>
+            </tr>
+          </thead>
+          <tbody></tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="footer-note">Прототип сайта на основе загруженного Excel-файла «Ипотечный калькулятор» · Все расчёты выполняются локально в браузере</div>
+<script>
+const REGIONS = [{"name":"Белгородская область","price":112190},{"name":"Брянская область","price":100851},{"name":"Владимирская область","price":105097},{"name":"Воронежская область","price":110762},{"name":"Ивановская область","price":94602},{"name":"Калужская область","price":98918},{"name":"Костромская область","price":84455},{"name":"Курская область","price":133482},{"name":"Липецкая область","price":98180},{"name":"Московская область","price":208672},{"name":"Орловская область","price":88088},{"name":"Рязанская область","price":94863},{"name":"Смоленская область","price":95811},{"name":"Тамбовская область","price":76850},{"name":"Тверская область","price":91308},{"name":"Тульская область","price":107068},{"name":"Ярославская область","price":103789},{"name":"Город федерального значения Москва","price":229661},{"name":"Республика Карелия (без учета части территории Республики Карелия, относящейся к сухопутным территориям Арктической зоны Российской Федерации)","price":117708},{"name":"Республика Карелия (без учета части территории Республики Карелия, относящейся к сухопутным территориям Арктической зоны Российской Федерации)","price":120258},{"name":"Часть территории Республики Карелия, относящаяся к сухопутным территориям Арктической зоны Российской Федерации","price":145558},{"name":"Республика Коми (без учета части территории Республики Коми, относящейся к сухопутным территориям Арктической зоны Российской Федерации)","price":101868},{"name":"Часть территории Республики Коми, относящаяся к сухопутным территориям Арктической зоны Российской Федерации","price":117902},{"name":"Архангельская область (без учета части территории Архангельской области, относящейся к сухопутным территориям Арктической зоны Российской Федерации)","price":122550},{"name":"Часть территории Архангельской области, относящаяся к сухопутным территориям Арктической зоны Российской Федерации","price":144209},{"name":"Вологодская область","price":107111},{"name":"Калининградская область","price":132685},{"name":"Ленинградская область","price":165541},{"name":"Мурманская область","price":153481},{"name":"Новгородская область","price":99178},{"name":"Псковская область","price":84735},{"name":"Ненецкий автономный округ","price":134442},{"name":"Город федерального значения Санкт-Петербург","price":165315},{"name":"Республика Калмыкия","price":87459},{"name":"Республика Адыгея (Адыгея)","price":124121},{"name":"Республика Калмыкия","price":89448},{"name":"Республика Крым","price":166309},{"name":"Краснодарский край","price":149606},{"name":"Астраханская область","price":109940},{"name":"Волгоградская область","price":104005},{"name":"Ростовская область","price":109478},{"name":"Город федерального значения Севастополь","price":182443},{"name":"Кабардино-Балкарская Республика","price":84540},{"name":"Республика Дагестан","price":78829},{"name":"Республика Ингушетия","price":61716},{"name":"Кабардино-Балкарская Республика","price":85590},{"name":"Карачаево-Черкесская Республика","price":91458},{"name":"Республика Северная Осетия - Алания","price":97077},{"name":"Чеченская Республика","price":88072},{"name":"Ставропольский край","price":113845},{"name":"Республика Татарстан (Татарстан)","price":170477},{"name":"Республика Башкортостан","price":117628},{"name":"Республика Марий Эл","price":98392},{"name":"Республика Мордовия","price":101149},{"name":"Республика Татарстан (Татарстан)","price":169604},{"name":"Удмуртская Республика","price":118073},{"name":"Чувашская Республика - Чувашия","price":108881},{"name":"Пермский край","price":143265},{"name":"Кировская область","price":107371},{"name":"Нижегородская область","price":152244},{"name":"Оренбургская область","price":95158},{"name":"Пензенская область","price":92132},{"name":"Самарская область","price":112825},{"name":"Саратовская область","price":98099},{"name":"Ульяновская область","price":105899},{"name":"Ханты-Мансийский автономный округ - Югра (без учета части территории Ханты-Мансийского автономного округа - Югра, относящейся к сухопутным территориям Арктической зоны Российской Федерации)","price":116192},{"name":"Курганская область","price":96579},{"name":"Свердловская область","price":115025},{"name":"Тюменская область","price":123530},{"name":"Челябинская область","price":113829},{"name":"Ханты-Мансийский автономный округ - Югра (без учета части территории Ханты-Мансийского автономного округа - Югра, относящейся к сухопутным территориям Арктической зоны Российской Федерации)","price":116250},{"name":"Часть территории Ханты-Мансийского автономного округа - Югра, относящаяся к сухопутным территориям Арктической зоны Российской Федерации","price":127751},{"name":"Ямало-Ненецкий автономный округ","price":193629},{"name":"Часть территории Красноярского края, относящаяся к сухопутным территориям Арктической зоны Российской Федерации","price":144820},{"name":"Республика Алтай","price":182758},{"name":"Республика Тыва","price":140121},{"name":"Республика Хакасия","price":111149},{"name":"Алтайский край","price":116087},{"name":"Красноярский край (без учета части территории Красноярского края, относящейся к сухопутным территориям Арктической зоны Российской Федерации)","price":118699},{"name":"Часть территории Красноярского края, относящаяся к сухопутным территориям Арктической зоны Российской Федерации","price":147175},{"name":"Иркутская область","price":126791},{"name":"Кемеровская область - Кузбасс","price":112008},{"name":"Новосибирская область","price":119646},{"name":"Омская область","price":120272},{"name":"Томская область","price":128088},{"name":"Сахалинская область","price":194486},{"name":"Республика Саха (Якутия)","price":166307},{"name":"Камчатский край","price":179512},{"name":"Приморский край","price":184478},{"name":"Хабаровский край","price":168746},{"name":"Амурская область","price":170803},{"name":"Магаданская область","price":168320},{"name":"Сахалинская область","price":197083},{"name":"Еврейская автономная область","price":174073},{"name":"Чукотский автономный округ","price":174073},{"name":"Республика Бурятия","price":152506},{"name":"Забайкальский край","price":178901},{"name":"Луганская Народная Республика","price":123700},{"name":"Донецкая Народная Республика","price":123700},{"name":"Запорожская область","price":123700},{"name":"Херсонская область","price":123700}];
+
+const regionSelect = document.getElementById('region');
+REGIONS.forEach((r) => {
+  const opt = document.createElement('option');
+  opt.value = r.price;
+  opt.dataset.name = r.name;
+  opt.textContent = r.name;
+  if (r.name === 'Брянская область') opt.selected = true;
+  regionSelect.appendChild(opt);
+});
+
+const priceEl = document.getElementById('price');
+const downEl = document.getElementById('downpayment');
+const rateEl = document.getElementById('rate');
+const areaEl = document.getElementById('area');
+const regionInfo = document.getElementById('regionInfo');
+const rateBadge = document.getElementById('rateBadge');
+const yearsEl = document.getElementById('years');
+const paymentTypeEl = document.getElementById('paymentType');
+const warnDown = document.getElementById('warnDown');
+
+const fmt = n => Math.round(n).toLocaleString('ru-RU') + ' ₽';
+const fmtPct = n => n.toFixed(3).replace('.', ',') + ' %';
+
+let pieChart, lineChart;
+
+function calculate(){
+  const price = parseFloat(priceEl.value) || 0;
+  let down = parseFloat(downEl.value) || 0;
+  const minDown = price * 0.201;
+  let warned = false;
+  if (down < minDown){ down = minDown; warned = true; }
+  warnDown.classList.toggle('show', warned);
+
+  const annualRate = parseFloat(rateEl.value) / 100;
+  rateBadge.textContent = (annualRate*100).toFixed(1) + '%';
+  const years = parseInt(yearsEl.value) || 1;
+  const months = years * 12;
+  const monthlyRate = annualRate / 12;
+  const loanSum = price - down;
+
+  const areaVal = parseFloat(areaEl.value) || 60;
+  const selectedOption = regionSelect.options[regionSelect.selectedIndex];
+  const regionName = selectedOption ? selectedOption.dataset.name : '';
+  const regionPricePerM2 = parseFloat(regionSelect.value) || 0;
+  const isCapital = (regionName === 'Город федерального значения Москва' || regionName === 'Город федерального значения Санкт-Петербург');
+  const pk = isCapital ? 1.8 : 1.2;
+  const normCost = areaVal * regionPricePerM2 * pk;
+  const subsidyMonths = Math.min(months, 180);
+
+  regionInfo.innerHTML = 'Коэффициент: <b>' + pk + '</b> ' + (isCapital ? '(Москва/СПб)' : '(прочие регионы)') +
+    ' · Норм. стоимость жилья: <b>' + fmt(normCost) + '</b> · Срок дотирования: <b>' + subsidyMonths + ' мес.</b>';
+
+  let schedule = [];
+  let totalPayment = 0;
+  let totalInterest = 0;
+  let totalSubsidy = 0;
+
+  function subsidyLimit(m){
+    if (m > subsidyMonths) return 0;
+    const raw = normCost * (annualRate*100/1200) * (1 - (m-1)/subsidyMonths);
+    return Math.max(raw, 0);
+  }
+
+  if (paymentTypeEl.value === 'annuity'){
+    const annuity = loanSum * monthlyRate / (1 - Math.pow(1+monthlyRate, -months));
+    let balance = loanSum;
+    for (let m=1; m<=months; m++){
+      const interest = balance * monthlyRate;
+      const principal = annuity - interest;
+      const endBalance = balance - principal;
+      const limit = subsidyLimit(m);
+      const employerComp = Math.min(limit, interest);
+      const employeeExtra = Math.max(0, interest - limit);
+      const employeeTotal = principal + employeeExtra;
+      schedule.push({n:m, start:balance, interest, principal, payment:annuity, end:Math.max(endBalance,0),
+        limit, employerComp, employeeExtra, employeeTotal});
+      totalPayment += annuity; totalInterest += interest; totalSubsidy += employerComp;
+      balance = endBalance;
+    }
+    document.getElementById('rMonthly').textContent = fmt(annuity);
+  } else {
+    const principalPart = loanSum / months;
+    let balance = loanSum;
+    for (let m=1; m<=months; m++){
+      const interest = balance * monthlyRate;
+      const payment = principalPart + interest;
+      const endBalance = balance - principalPart;
+      const limit = subsidyLimit(m);
+      const employerComp = Math.min(limit, interest);
+      const employeeExtra = Math.max(0, interest - limit);
+      const employeeTotal = principalPart + employeeExtra;
+      schedule.push({n:m, start:balance, interest, principal:principalPart, payment, end:Math.max(endBalance,0),
+        limit, employerComp, employeeExtra, employeeTotal});
+      totalPayment += payment; totalInterest += interest; totalSubsidy += employerComp;
+      balance = endBalance;
+    }
+    document.getElementById('rMonthly').textContent = fmt(schedule[0].payment) + ' → ' + fmt(schedule[schedule.length-1].payment);
+  }
+
+  document.getElementById('rLoanSum').textContent = fmt(loanSum);
+  document.getElementById('rDownFact').textContent = fmt(down);
+  document.getElementById('rMonthlyRate').textContent = fmtPct(monthlyRate*100);
+  document.getElementById('rOverpay').textContent = fmt(totalInterest);
+  document.getElementById('rTotal').textContent = fmt(totalPayment);
+  document.getElementById('rNormCost').textContent = fmt(normCost);
+  document.getElementById('rSubsidyTotal').textContent = fmt(totalSubsidy);
+
+  renderTable(schedule);
+  renderCharts(loanSum, down, totalInterest, schedule);
+  window.__schedule = schedule;
+}
+
+function renderTable(schedule){
+  const tbody = document.querySelector('#scheduleTable tbody');
+  tbody.innerHTML = '';
+  const frag = document.createDocumentFragment();
+  schedule.forEach(row => {
+    const tr = document.createElement('tr');
+    tr.innerHTML = '<td>' + row.n + '</td><td>' + fmt(row.start) + '</td><td>' + fmt(row.interest) + '</td>' +
+      '<td>' + fmt(row.principal) + '</td><td>' + fmt(row.payment) + '</td><td>' + fmt(row.end) + '</td>' +
+      '<td>' + fmt(row.limit) + '</td><td style="color:var(--green)">' + fmt(row.employerComp) + '</td>' +
+      '<td>' + fmt(row.employeeTotal) + '</td>';
+    frag.appendChild(tr);
+  });
+  tbody.appendChild(frag);
+}
+
+function renderCharts(loanSum, down, totalInterest, schedule){
+  if (typeof Chart === 'undefined') return;
+  const pieCtx = document.getElementById('pieChart').getContext('2d');
+  if (pieChart) pieChart.destroy();
+  pieChart = new Chart(pieCtx, {
+    type: 'doughnut',
+    data: {
+      labels: ['Первоначальный взнос', 'Сумма кредита', 'Переплата по процентам'],
+      datasets: [{ data: [down, loanSum, totalInterest], backgroundColor: ['#16a34a', '#2563eb', '#dc2626'] }]
+    },
+    options: { plugins:{legend:{position:'bottom'}}, maintainAspectRatio:false }
+  });
+
+  const step = Math.max(1, Math.ceil(schedule.length/60));
+  const sampled = schedule.filter((_,i)=> i % step === 0);
+
+  const lineCtx = document.getElementById('lineChart').getContext('2d');
+  if (lineChart) lineChart.destroy();
+  lineChart = new Chart(lineCtx, {
+    type: 'line',
+    data: {
+      labels: sampled.map(r=>r.n),
+      datasets: [
+        { label:'Остаток долга', data: sampled.map(r=>r.end), borderColor:'#2563eb', backgroundColor:'rgba(37,99,235,.1)', fill:true, tension:.2, yAxisID:'y' },
+        { label:'Платёж', data: sampled.map(r=>r.payment), borderColor:'#dc2626', borderDash:[5,3], tension:.2, yAxisID:'y1' }
+      ]
+    },
+    options: {
+      maintainAspectRatio:false,
+      scales: {
+        y: { position:'left', title:{display:true, text:'Остаток долга, ₽'} },
+        y1: { position:'right', grid:{drawOnChartArea:false}, title:{display:true, text:'Платёж, ₽'} }
+      }
+    }
+  });
+}
+
+document.getElementById('exportCsv').addEventListener('click', () => {
+  const sched = window.__schedule || [];
+  let csv = '№;Остаток на начало;Проценты;Основной долг;Платёж;Остаток на конец;Лимит по %;Компенсация работодателя;Доплата из своих средств\n';
+  sched.forEach(r=>{
+    csv += r.n + ';' + r.start.toFixed(2) + ';' + r.interest.toFixed(2) + ';' + r.principal.toFixed(2) + ';' +
+      r.payment.toFixed(2) + ';' + r.end.toFixed(2) + ';' + r.limit.toFixed(2) + ';' +
+      r.employerComp.toFixed(2) + ';' + r.employeeTotal.toFixed(2) + '\n';
+  });
+  const blob = new Blob(['\ufeff'+csv], {type:'text/csv;charset=utf-8;'});
+  const link = document.createElement('a');
+  link.href = URL.createObjectURL(blob);
+  link.download = 'график_платежей.csv';
+  link.click();
+});
+
+rateEl.addEventListener('input', () => {
+  rateBadge.textContent = parseFloat(rateEl.value).toFixed(1) + '%';
+});
+
+document.getElementById('calcBtn').addEventListener('click', calculate);
+
+[priceEl, downEl, yearsEl].forEach(el => {
+  el.addEventListener('keydown', (e) => { if (e.key === 'Enter') calculate(); });
+});
+
+calculate();
+</script>
+</body>
+</html>
